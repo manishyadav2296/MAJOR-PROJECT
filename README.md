@@ -1,22 +1,34 @@
-# Major Project
+# 🌟 Major Project
 
-## Description
-Brief overview of project does.
+A full-stack web application built using **Node.js**, **Express**, **MongoDB**, and **EJS**. This project serves as the backend foundation for a scalable web app with essential modules like authentication, file upload, routing, and more.
 
-## Features
-- Feature 1
-- Feature 2
+---
 
-## Tech Stack
-- Node.js
-- Express.js
-- MongoDB / Mongoose
-- EJS, CSS, etc.
+## 🚀 Features
 
-## Setup Instructions
-```bash
-git clone https://github.com/manishyadav2296/MAJOR-PROJECT.git
-cd MAJOR-PROJECT
-npm install
-npm start
+- User authentication (Login/Signup)
+- RESTful API endpoints
+- File uploads
+- MVC architecture (Controllers, Routes, Models, Views)
+- MongoDB/Mongoose integration
+- EJS templating
+- Public and protected routes
+- Environment configuration
+
+---
+
+## 🧰 Tech Stack
+
+- **Backend:** Node.js, Express.js
+- **Database:** MongoDB + Mongoose
+- **Templating Engine:** EJS
+- **Frontend:** HTML/CSS (basic styling)
+- **File Handling:** Multer
+- **Version Control:** Git & GitHub
+
+---
+
+## 📁 Project Structure
+
+
 
