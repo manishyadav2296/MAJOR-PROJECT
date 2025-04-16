@@ -87,8 +87,9 @@ if(process.env.NODE_ENV !== "production"){
   
   // ✅ Root route added here
   app.get("/", (req, res) => {
-      res.render("home");
-  });
+    res.redirect("/listings");
+});
+
   
   // Mount routers
   app.use("/listings", listingRouter);
