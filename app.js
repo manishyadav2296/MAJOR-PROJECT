@@ -1,21 +1,30 @@
-
-
 // Import required modules
+if(process.env.NODE_ENV !="production"){
+  require('dotenv').config();  
+}
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
-const Listing = require("./models/listing.js");
 const path = require("path");
 const methodOverride = require("method-override");
 const ejsMate = require("ejs-mate");
-const wrapAsync = require("./utils/wrapAsync.js");
 const ExpressError = require("./utils/ExpressError.js");
-const { listingSchema } = require("./schema.js");
-const { error } = require("console");
 
-// MongoDB connection URL
-const MONGO_URL = "mongodb://127.0.0.1:27017/wanderlust";
+const session = require("express-session");
+const MongoStore=require("connect-mongo")
+const flash = require("connect-flash");
 
+const passport = require("passport");
+const LocalStrategy = require("passport-local");
+const User = require("./models/user.js");
+
+// Import route handlers
+const listingRouter = require("./routes/listing.js");
+const reviewRouter = require("./routes/review.js");
+const userRouter = require("./routes/user.js");
+
+
+ const dbUrl=process.env.ATLASDB_URL;
 // Connect to MongoDB
 main().then(() => {
     console.log("connected to DB")
@@ -23,107 +32,92 @@ main().then(() => {
     console.log(err);
 });
 
+// Async function to connect to MongoDB
 async function main() {
-    await mongoose.connect(MONGO_URL);
+    await mongoose.connect(dbUrl);
 }
 
 // Set view engine and views path
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
+app.set("view engine", "ejs"); // Use EJS as templating engine
+app.set("views", path.join(__dirname, "views")); // Set views directory
 
 // Middleware
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data (form submissions)
-app.use(methodOverride("_method")); // Override methods (like PUT & DELETE)
-app.engine("ejs", ejsMate); // Use ejs-mate for layout support
-app.use(express.static(path.join(__dirname, "/public"))); // Serve static assets from public/
+app.use(express.urlencoded({ extended: true })); // Parse incoming form data
+app.use(methodOverride("_method")); // Support HTTP method override
+app.engine("ejs", ejsMate); // Use EJS Mate for layouts
+app.use(express.static(path.join(__dirname, "/public"))); // Serve static files
 
-// Root route
-app.get("/", (req, res) => {
-    res.send("Hi, i'm root")
+
+const store=MongoStore.create({
+    mongoUrl:dbUrl,
+    crypto:{
+        secret:process.env.SECRET,
+    },
+    touchAfter:24*3600,
 });
-
-// Middleware to validate listing input using Joi schema
-const validateListing = (req, res, next) => {
-    let { error } = listingSchema.validate(req.body);
-    if (error) {
-        let errMsg = error.details.map((el) => el.message).join(",");
-        throw new ExpressError(400, errMsg); // Throw formatted error
-    } else {
-        next(); // Proceed if valid
+store.on("error",()=>{
+    console.log("ERROR IN MONGO SESSION STORE", err);
+})
+// Session configuration
+const sessionOptions = {
+    store,
+    secret: process.env.SECRET, // Secret for signing the session ID cookie
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: true, // Save uninitialized session
+    cookie: {
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Cookie expiration set to 1 week
+        maxAge: 7 * 24 * 60 * 60 * 1000, // Max age for cookie
+        httpOnly: true, // Prevents client-side JS from accessing the cookie
     }
 };
 
-// Index route – show all listings
-app.get("/listings", wrapAsync(async (req, res) => {
-    const allListings = await Listing.find({});
-    res.render("listings/index.ejs", { allListings });
-}));
+app.use(session(sessionOptions)); // Use session middleware
+app.use(flash()); // Use flash messages
 
-// New route – render form for new listing
-app.get("/listings/new", (req, res) => {
-    res.render("listings/new.ejs");
+// Root route
+// app.get("/", (req, res) => {
+//     res.send("Hi, i'm root") // Simple root response
+// });
+
+// Initialize Passport and restore authentication state
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate())); // Use local strategy with Passport
+
+passport.serializeUser(User.serializeUser()); // Serialize user to session
+passport.deserializeUser(User.deserializeUser()); // Deserialize user from session
+
+// Middleware to pass flash messages and current user to all views
+app.use((req, res, next) => {
+    res.locals.currentUser = req.user; // Current logged-in user
+    res.locals.success = req.flash("success"); // Flash success messages
+    res.locals.error = req.flash("error"); // Flash error messages
+    res.locals.currUser=req.user;
+    next();
 });
 
-// Show route – show individual listing
-app.get("/listings/:id", wrapAsync(async (req, res) => {
-    let { id } = req.params;
-    const listing = await Listing.findById(id);
-    res.render("listings/show.ejs", { listing });
-}));
-
-// Create route – add listing to DB
-app.post("/listings", validateListing, wrapAsync(async (req, res, next) => {
-    const newListing = new Listing(req.body.listing);
-    await newListing.save();
-    res.redirect("/listings");
-}));
-
-// Edit route – render edit form for a listing
-app.get("/listings/:id/edit", wrapAsync(async (req, res) => {
-    let { id } = req.params;
-    const listing = await Listing.findById(id);
-    res.render("listings/edit.ejs", { listing });
-}));
-
-// Update route – update existing listing
-app.put("/listings/:id", validateListing, wrapAsync(async (req, res) => {
-    let { id } = req.params;
-    await Listing.findByIdAndUpdate(id, { ...req.body.listing });
-    res.redirect("/listings");
-}));
-
-// Delete route – delete a listing
-app.delete("/listings/:id", wrapAsync(async (req, res) => {
-    let { id } = req.params;
-    let deletedListing = await Listing.findByIdAndDelete(id);
-    console.log(deletedListing);
-    res.redirect("/listings");
-}));
-// app.get("/testListing", async(req,res)=>{
-//     let sampleListing = new Listing({
-//         title:"My New Villa",
-//         description:"By the beach",
-//         price:1200,
-//         location:"Calanguta,Goa",
-//         country:"India"
-//     });
-//     await sampleListing.save(),
-//     console.log("sample was save")
-//     res.send("successful testing")
-
+// Demo route to create a user (commented out)
+// app.get("/demouser", async(req,res)=>{
+//     let fakeUser= new User({
+//         email: "student2@gmail.com",
+//         username:"delta-student-2"
+//     })
+//   let registerdUser = await User.register(fakeUser,"helloworld")
+//   res.send(registerdUser);
 // })
-// app.all("*",(req,res,next)=>{
-//   next(new ExpressError(404,"Page Not Found"))
-// })
+
+// Mount routers
+app.use("/listings", listingRouter); // Listings routes
+app.use("/listings/:id/reviews", reviewRouter); // Review routes
+app.use("/", userRouter); // User authentication routes
 
 // Error-handling middleware
 app.use((err, req, res, next) => {
     let { statusCode = 500, message = "Something went wrong" } = err;
-    res.status(statusCode).render("error.ejs", { message }); // Render error template
-    // Optionally log or respond differently in development vs. production
+    res.status(statusCode).render("error.ejs", { message }); // Render custom error page
 });
 
-// Start server on port 8080
+// Start the server on port 8080
 app.listen(8080, () => {
     console.log("server is listening");
 });

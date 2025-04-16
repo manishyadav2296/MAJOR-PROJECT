@@ -26,14 +26,18 @@
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans&display=swap"
-    rel="stylesheet">
+    rel="stylesheet"/>
+    <link href="/css/rating.css" rel="stylesheet" />
+    
 </head>
 <body>
     <!-- Include the navbar from includes folder -->
     <%- include("../includes/navbar.ejs") %>
 
     <!-- Main content placeholder (EJS will inject content here) -->
-    <div class="container"><%- body %></div>
+    <div class="container">
+        <%- include("../includes/flash.ejs") %><%- body %>
+        </div>
 
     <!-- Include the footer -->
     <%- include("../includes/footer.ejs") %>
